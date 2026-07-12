@@ -1,6 +1,6 @@
-# Script that builds libfsapfs
+﻿# Script that builds libfsapfs
 #
-# Version: 20260608
+# Version: 20260709
 
 Param (
 	[string]$Configuration = ${Env:Configuration},
@@ -9,7 +9,9 @@ Param (
 	[string]$PythonPath = "C:\Python314",
 	[string]$VisualStudioVersion = "",
 	[string]$VSToolsOptions = "--extend-with-x64",
-	[string]$VSToolsPath = "..\vstools"
+	[string]$VSToolsPath = "..\vstools",
+	[string]$OutDir = "",
+	[string]$MSBuildPath = ""
 )
 
 $ExitSuccess = 0
@@ -66,7 +68,14 @@ if ($VisualStudioVersion -NotIn ("2008", "2010", "2012", "2013", "2015", "2017",
 
 	Exit ${ExitFailure}
 }
-$MSBuild = If (Get-Command "MSBuild.exe" -ErrorAction SilentlyContinue) { (Get-Command "MSBuild.exe").Source } else { "" }
+If (${MSBuildPath})
+{
+	$MSBuild = ${MSBuildPath}
+}
+Else
+{
+	$MSBuild = If (Get-Command "MSBuild.exe" -ErrorAction SilentlyContinue) { (Get-Command "MSBuild.exe").Source } else { "" }
+}
 
 If (-Not ${MSBuild})
 {
@@ -223,13 +232,25 @@ If (${PlatformToolset})
 {
 	$MSBuildOptions = "${MSBuildOptions} /property:PlatformToolset=${PlatformToolset}"
 }
+If (${OutDir})
+{
+	$MSBuildOptions = "${MSBuildOptions} /property:OutDir=${OutDir}"
+}
 If (${Env:APPVEYOR} -eq "True")
 {
-	Invoke-Expression -Command "& '${MSBuild}' ${MSBuildOptions} ${VSSolutionFile} /logger:'C:\Program Files\AppVeyor\BuildAgent\Appveyor.MSBuildLogger.dll' 2>&1" | %{ "$_" }
+	$Output = Invoke-Expression -Command "& '${MSBuild}' ${MSBuildOptions} ${VSSolutionFile} /logger:'C:\Program Files\AppVeyor\BuildAgent\Appveyor.MSBuildLogger.dll' 2>&1" | %{ "$_" }
 }
 Else
 {
-	Invoke-Expression -Command "& '${MSBuild}' ${MSBuildOptions} ${VSSolutionFile} 2>&1" | %{ "$_" }
+	$Output = Invoke-Expression -Command "& '${MSBuild}' ${MSBuildOptions} ${VSSolutionFile} 2>&1" | %{ "$_" }
 }
 
+# MSBuild sets $LastExitCode; only surface its (verbose) output when the build
+# actually failed, otherwise stay quiet as per /verbosity:quiet above.
+If (${LastExitCode} -ne 0)
+{
+	Write-Host ${Output}
+
+	Exit ${ExitFailure}
+}
 Exit ${ExitSuccess}

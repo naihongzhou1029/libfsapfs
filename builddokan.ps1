@@ -1,12 +1,18 @@
-# Script that builds dokan
+﻿# Script that builds dokan
 #
-# Version: 20180322
+# Version: 20260709
 
 Param (
 	[string]$Configuration = ${Env:Configuration},
 	[string]$Platform = ${Env:Platform},
-	[switch]$UseLegacyVersion = $false
+	[switch]$UseLegacyVersion = $false,
+	[string]$MSBuildPath = "",
+	[string]$WindowsSdkVersion = "",
+	[string]$PlatformToolset = ""
 )
+
+$ExitSuccess = 0
+$ExitFailure = 1
 
 If (-not ${Configuration})
 {
@@ -17,7 +23,11 @@ If (-not ${Platform})
 	$Platform = "Win32"
 }
 
-If (${Env:AppVeyor} -eq "True")
+If (${MSBuildPath})
+{
+	$MSBuild = ${MSBuildPath}
+}
+ElseIf (${Env:AppVeyor} -eq "True")
 {
 	$MSBuild = "MSBuild.exe"
 }
@@ -35,6 +45,34 @@ Else
 }
 $MSBuildOptions = "/verbosity:quiet /target:Build /property:Configuration=${Configuration},Platform=${Platform}"
 
+If (-Not ${UseLegacyVersion})
+{
+	# dokany's dokan.vcxproj pins WindowsTargetPlatformVersion to a specific
+	# SDK release that may not be the one installed on this machine; override
+	# it with whatever SDK is actually present instead of patching the
+	# (externally synced) project file.
+	If (-Not ${WindowsSdkVersion})
+	{
+		$Results = Get-ChildItem -Path "C:\Program Files (x86)\Windows Kits\10\Include\10.*" -Directory -ErrorAction SilentlyContinue |
+			Sort-Object -Property Name -Descending
+
+		If (${Results}.Count -gt 0)
+		{
+			$WindowsSdkVersion = ${Results}[0].Name
+		}
+	}
+	If (${WindowsSdkVersion})
+	{
+		$MSBuildOptions = "${MSBuildOptions} /property:WindowsTargetPlatformVersion=${WindowsSdkVersion}"
+	}
+	# dokan.vcxproj also pins PlatformToolset (eg. v141 for VS2017), which may
+	# not be installed alongside a newer Visual Studio; let the caller override
+	# it with whatever toolset it already resolved for the main build.
+	If (${PlatformToolset})
+	{
+		$MSBuildOptions = "${MSBuildOptions} /property:PlatformToolset=${PlatformToolset}"
+	}
+}
 If ($UseLegacyVersion)
 {
 	$DokanPath = "../dokan"
@@ -52,10 +90,19 @@ Try
 {
 	Write-Host "${MSBuild} ${MSBuildOptions} ${ProjectFile}"
 
-	Invoke-Expression -Command "& '${MSBuild}' ${MSBuildOptions} ${ProjectFile}"
+	# PowerShell will raise NativeCommandError if MSBuild writes to stdout or stderr
+	# therefore 2>&1 is added and the output is stored in a variable.
+	$Output = Invoke-Expression -Command "& '${MSBuild}' ${MSBuildOptions} ${ProjectFile} 2>&1" | %{ "$_" }
 }
 Finally
 {
 	Pop-Location
 }
+If (${LastExitCode} -ne 0)
+{
+	Write-Host ${Output}
+
+	Exit ${ExitFailure}
+}
+Exit ${ExitSuccess}
 

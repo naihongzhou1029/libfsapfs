@@ -38,6 +38,9 @@ Makefile.bcc
 Makefile.in
 stamp-h[1-9]
 
+# Generated MSVC solution/project files (msvscpp_convert.py output via build.ps1)
+/vs[0-9][0-9][0-9][0-9]/
+
 # Specific auto-generated build files
 /ABOUT-NLS
 /aclocal.m4

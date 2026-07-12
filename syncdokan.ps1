@@ -1,6 +1,6 @@
-# Script that synchronizes dokan
+﻿# Script that synchronizes dokan
 #
-# Version: 20190810
+# Version: 20260709
 
 Param (
 	[switch]$UseHead = $false,
@@ -8,6 +8,12 @@ Param (
 )
 
 $Git = "git"
+
+# msvscpp_convert.py's --with-dokany option (vstools\vstools\libyal.py) still
+# hardcodes the pre-v2 output name "dokan1.lib" (DOKANAPIVersion=1); dokany
+# 2.x builds "dokan2.lib" instead, so the latest dokany tag will not link.
+# v1.5.1.1000 is the last release that still matches what the converter emits.
+$CompatibleTag = "v1.5.1.1000"
 
 If (${UseLegacyVersion})
 {
@@ -31,8 +37,14 @@ Try
 {
 	$Output = Invoke-Expression -Command "${Git} fetch --quiet --all --tags --prune 2>&1"
 
-	$LatestTag = Invoke-Expression -Command "${Git} describe --tags --abbrev=0 2>&1"
-
+	If (-Not ${UseLegacyVersion})
+	{
+		$LatestTag = ${CompatibleTag}
+	}
+	Else
+	{
+		$LatestTag = Invoke-Expression -Command "${Git} describe --tags --abbrev=0 2>&1"
+	}
 	If (${LatestTag} -and -not ${UseHead})
 	{
 		Write-Host "Synchronizing: dokan from ${GitUrl} tag ${LatestTag}"
