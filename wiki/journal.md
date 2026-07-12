@@ -1,4 +1,13 @@
+# 開發日誌索引 / Development Journal Index
+
 # 2026/07/09
+
+## AGENTS.md 專案指引
+
+- 調查 Windows 建置方式：專案內建 `msvscpp/libfsapfs.sln`（Visual Studio 2008 格式），包含 `fsapfsinfo`、`fsapfsmount`、`libfsapfs`、`pyfsapfs`、60+ 測試專案及 `zlib` 相依。開啟後 VS 會觸發一次性升級。僅有 Win32 平台組態，無 x64。FUSE 掛載工具在 Windows 上需要額外搭配 WinFUSE/Dokany。
+- 探索 libfsapfs 專案結構（autotools C 函式庫、Python 繫結、CLI 工具），讀取 `configure.ac`、`Makefile.am`、`README`、`tox.ini`、測試基礎設施等關鍵原始檔。
+- 建立 `AGENTS.md`，涵蓋建構系統、儲存庫結構、測試方式（C Autotest + Python）、Python 打包流程、常見任務表格、平台注意事項及注意事項。
+- 提交並推送 `AGENTS.md` 至 `main`（commit `0e8137d`）。
 
 ## Dokan 核心驅動程式的下載與安裝
 

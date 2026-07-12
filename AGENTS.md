@@ -3,12 +3,26 @@
 **Project**: C library to access Apple File System (APFS), version 2 (read-only). Status: experimental. License: LGPL-3.0-or-later.
 
 ## Build System
-Autotools (autoconf/automake/libtool). Standard workflow:
+### Unix (Autotools)
+Standard workflow:
 ```sh
 ./configure [options]    # Run from repo root after autoreconf -fi if needed
 make                     # Builds all subdirectories
 make check               # Run full test suite (requires build first)
 ```
+
+### Windows (PowerShell)
+Use `devops.ps1` to manage the toolchain environment and build tasks:
+```powershell
+.\devops.ps1 env        # Pre-flight check and build local dependencies (zlib, dokan)
+.\devops.ps1 build      # Build release artifacts into build/
+.\devops.ps1 rebuild    # Clean and rebuild the project
+```
+Available options for `devops.ps1`:
+- `-Configuration <Release|Debug>` (default: Release)
+- `-Platform <x64|Win32|ARM64>` (default: x64)
+- `-VisualStudioVersion <2019|2022>` (default: auto-detected)
+- `-BuildDir <path>` (default: build)
 
 **Key configure options** (see `configure.ac`):
 - `--enable-python` / `--disable-python` - Python bindings (pyfsapfs)
@@ -96,19 +110,20 @@ Python test discovery: `tests/runtests.py` uses `unittest` to discover `tests/*.
 ## Common Tasks
 | Task | Command |
 |------|---------|
-| Configure with Python bindings | `./configure --enable-python` |
-| Build everything | `make` |
-| Run all tests | `make check` |
+| Configure with Python bindings | `./configure --enable-python` (Unix) or `.\devops.ps1 env` (Windows) |
+| Build everything | `make` (Unix) or `.\devops.ps1 build` (Windows) |
+| Run all tests | `make check` (Unix) or `.\runtests.ps1` (Windows) |
 | Run Python tests only | `tox` or `python tests/runtests.py` |
 | Build Python wheel | `python -m build --wheel --no-isolation` |
-| Clean build artifacts | `make clean` (or `git clean -fdx` for full reset) |
+| Clean build artifacts | `make clean` (Unix) or `.\devops.ps1 clean` (Windows) |
 | Regenerate configure | `autoreconf -fi` |
 
 ## Platform Notes
-- **Windows**: Uses `msvscpp/` for Visual Studio project; `LT_INIT([win32-dll])` in configure.ac enables DLL support
-- **macOS**: `runtests.sh` fixes `install_name_tool` for dylib paths
-- **Linux**: Standard autotools; pkg-config via `libfsapfs.pc`
-- Test inputs in `tests/input/` are **not** in git (see `.gitignore`) - must be generated/downloaded separately
+- Windows: Uses `msvscpp/` for Visual Studio project; `LT_INIT([win32-dll])` in configure.ac enables DLL support. The build can be fully driven on Windows via `devops.ps1`.
+- macOS: `runtests.sh` fixes `install_name_tool` for dylib paths.
+- Linux: Standard autotools; pkg-config via `libfsapfs.pc`.
+- Test inputs in `tests/input/` are not in git (see `.gitignore`) - must be generated/downloaded separately.
+- Dokan Driver Requirement: To build and run `fsapfsmount.exe` successfully, `.\devops.ps1 env` will sync and build a compatible version of Dokany (`v1.5.1.1000` to match `dokan1.lib` naming conventions). However, the Dokan kernel driver (e.g., `Dokan_x64.msi`) must be manually installed from https://github.com/dokan-dev/dokany/releases using the matching version, as kernel driver installation requires administrator privileges.
 
 ## Key Files to Know
 - `configure.ac` - All feature flags, dependency checks, version (20260626)
@@ -119,8 +134,9 @@ Python test discovery: `tests/runtests.py` uses `unittest` to discover `tests/*.
 - `README` - Supported/unsupported APFS features list
 
 ## Gotchas
-- **Generated files**: `configure`, `Makefile.in`, `include/*.h`, `libfsapfs.pc`, `libfsapfs.spec`, `pyproject.toml`, `common/config.h` are all generated - don't edit directly
-- **Test dependencies**: `make check-build` must succeed before `make check`
-- **Test data**: `tests/input/` ignored by git; tests skip if missing (`SKIP_TOOLS_TESTS` env)
-- **Subdirectory dependencies**: Link order in `tests/Makefile.am` `*_LDADD` must match dependency graph
-- **Python module**: Requires built `libfsapfs.la` and `pyfsapfs.la` in `.libs/`
+- Generated files: `configure`, `Makefile.in`, `include/*.h`, `libfsapfs.pc`, `libfsapfs.spec`, `pyproject.toml`, `common/config.h` are all generated - don't edit directly.
+- Test dependencies: `make check-build` must succeed before `make check`.
+- Test data: `tests/input/` ignored by git; tests skip if missing (`SKIP_TOOLS_TESTS` env).
+- Subdirectory dependencies: Link order in `tests/Makefile.am` `*_LDADD` must match dependency graph.
+- Python module: Requires built `libfsapfs.la` and `pyfsapfs.la` in `.libs/`.
+- Windows fsapfsmount.exe dependency: The tool requires `dokan1.dll` in the same directory (which `devops.ps1 build` copies automatically), and the matching Dokan kernel driver must be installed on the host system to mount APFS volumes.
