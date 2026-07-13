@@ -30,3 +30,13 @@ For more information see:
 * Project documentation: https://github.com/libyal/libfsapfs/wiki/Home
 * How to build from source: https://github.com/libyal/libfsapfs/wiki/Building
 
+Building on Windows:
+
+To configure and build this project on Windows:
+1. Run PowerShell as Administrator (if installing dependencies).
+2. Configure the build environment:
+   .\devops.ps1 env
+   (If VS Build Tools, C++ compiler, or Windows 10 SDK is missing, run: .\devops.ps1 env -InstallVisualStudio)
+3. Build the project:
+   .\devops.ps1 build
+

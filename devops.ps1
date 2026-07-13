@@ -33,7 +33,8 @@ Param (
 	[string]$VisualStudioVersion = "",
 	[string]$VSToolsOptions = "--extend-with-x64",
 	[string]$BuildDir = "build",
-	[switch]$InstallVisualStudio = $false
+	[switch]$InstallVisualStudio = $false,
+	[switch]$InstallDokan = $false
 )
 
 $ExitSuccess = 0
@@ -135,6 +136,19 @@ Function Get-DefaultPlatformToolset
 		"2026" { Return "v145" }
 		Default { Return "v143" }
 	}
+}
+
+Function Test-DokanDriverInstalled
+{
+	If (Get-Service -Name "dokan1" -ErrorAction SilentlyContinue)
+	{
+		Return $TRUE
+	}
+	If (Test-Path -Path "C:\Windows\System32\drivers\dokan1.sys")
+	{
+		Return $TRUE
+	}
+	Return $FALSE
 }
 
 Function Test-CppWorkload
@@ -273,9 +287,20 @@ Function Invoke-Env
 		}
 		If (${InstallVisualStudio})
 		{
-			Install-WithWinget -PackageId "Microsoft.VisualStudio.2022.BuildTools" -DisplayName "Visual Studio 2022 Build Tools" -ExtraArguments '--override "--quiet --wait --add Microsoft.VisualStudio.Workload.VCTools"' | Out-Null
+			$VSInstallerPath = "C:\Program Files (x86)\Microsoft Visual Studio\Installer\vs_installer.exe"
+			If (${MSBuild}.Path -and (Test-Path -Path $VSInstallerPath))
+			{
+				$VSInstallDir = ${MSBuild}.Path -Replace "\\MSBuild\\Current\\Bin\\MSBuild\.exe$", ""
+				Write-Host "Visual Studio Installer found. Modifying existing MSBuild installation to add C++ workload, compiler tools, and Windows 10 SDK..." -ForegroundColor Cyan
+				Start-Process -FilePath $VSInstallerPath -ArgumentList 'modify', '--installPath', "`"${VSInstallDir}`"", '--add', 'Microsoft.VisualStudio.Workload.VCTools', '--add', 'Microsoft.VisualStudio.Component.VC.Tools.x86.x64', '--add', 'Microsoft.VisualStudio.Component.Windows10SDK.19041', '--passive', '--norestart' -Verb RunAs -Wait
+			}
+			Else
+			{
+				Write-Host "Installing Visual Studio 2022 Build Tools with C++ workload, compiler tools, and Windows 10 SDK..." -ForegroundColor Cyan
+				Install-WithWinget -PackageId "Microsoft.VisualStudio.2022.BuildTools" -DisplayName "Visual Studio 2022 Build Tools" -ExtraArguments '--override "--quiet --wait --add Microsoft.VisualStudio.Workload.VCTools --add Microsoft.VisualStudio.Component.VC.Tools.x86.x64 --add Microsoft.VisualStudio.Component.Windows10SDK.19041"' | Out-Null
+			}
 
-			Write-Warning "Installer launched; re-run '.\devops.ps1 env' after it completes"
+			Write-Warning "Installer completed; re-run '.\devops.ps1 env' to verify"
 		}
 		Else
 		{
@@ -299,6 +324,26 @@ Function Invoke-Env
 	Write-Host "Using dokany (the actively maintained fork, supports x64/ARM64) at ..\dokany,"
 	Write-Host "not the legacy 0.6.0 fork the checked-in msvscpp\fsapfsmount.vcproj defaults"
 	Write-Host "to; 'build' passes --with-dokany so the generated solution points at it."
+
+	$DokanInstalled = Test-DokanDriverInstalled
+	If (-Not $DokanInstalled)
+	{
+		Write-Warning "Dokan kernel driver (dokan1.sys) is not installed."
+		If (${InstallDokan})
+		{
+			Write-Host "Installing Dokan Library v1.5.1.1000 via winget..." -ForegroundColor Cyan
+			Install-WithWinget -PackageId "dokan-dev.Dokany" -DisplayName "Dokan Library v1.5.1.1000" -ExtraArguments "-v 1.5.1.1000" | Out-Null
+			Write-Warning "Dokan installer launched; please verify the installation (requires reboot or service restart)"
+		}
+		Else
+		{
+			Write-Warning "Run '.\devops.ps1 env -InstallDokan' to attempt an unattended install of Dokan Library v1.5.1.1000 via winget"
+		}
+	}
+	Else
+	{
+		Write-Host "Dokan kernel driver detected (dokan1 service or driver file present)." -ForegroundColor Green
+	}
 
 	If (-Not (Invoke-Step -Description "Synchronizing dokan" -ScriptPath "${RepositoryRoot}\syncdokan.ps1")) { $Result = $FALSE }
 
@@ -419,6 +464,8 @@ Options:
   -BuildDir <path>                     Default: build
   -InstallVisualStudio                 Let 'env' attempt an unattended
                                         install of VS Build Tools via winget
+  -InstallDokan                        Let 'env' attempt an unattended
+                                        install of Dokan Library v1.5.1.1000 via winget
 
 Examples:
   .\devops.ps1 env
@@ -444,3 +491,5 @@ If (${Result})
 	Exit ${ExitSuccess}
 }
 Exit ${ExitFailure}
+
+

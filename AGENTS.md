@@ -119,7 +119,7 @@ Python test discovery: `tests/runtests.py` uses `unittest` to discover `tests/*.
 | Regenerate configure | `autoreconf -fi` |
 
 ## Platform Notes
-- Windows: Uses `msvscpp/` for Visual Studio project; `LT_INIT([win32-dll])` in configure.ac enables DLL support. The build can be fully driven on Windows via `devops.ps1`.
+- Windows: Uses `msvscpp/` for Visual Studio project; `LT_INIT([win32-dll])` in configure.ac enables DLL support. The build can be fully driven on Windows via `devops.ps1`. If MSBuild is present but C++ workload, compiler tools, or Windows 10 SDK (10.0.19041.0) is missing, run `.\devops.ps1 env -InstallVisualStudio` to automatically modify or install the required components.
 - macOS: `runtests.sh` fixes `install_name_tool` for dylib paths.
 - Linux: Standard autotools; pkg-config via `libfsapfs.pc`.
 - Test inputs in `tests/input/` are not in git (see `.gitignore`) - must be generated/downloaded separately.
@@ -140,3 +140,4 @@ Python test discovery: `tests/runtests.py` uses `unittest` to discover `tests/*.
 - Subdirectory dependencies: Link order in `tests/Makefile.am` `*_LDADD` must match dependency graph.
 - Python module: Requires built `libfsapfs.la` and `pyfsapfs.la` in `.libs/`.
 - Windows fsapfsmount.exe dependency: The tool requires `dokan1.dll` in the same directory (which `devops.ps1 build` copies automatically), and the matching Dokan kernel driver must be installed on the host system to mount APFS volumes.
+- Windows Build Workload/SDK Issues: If building Dokan fails due to a missing Windows 10 SDK (10.0.19041.0) or `CL.exe` missing errors, run `.\devops.ps1 env -InstallVisualStudio`. The script will detect the existing MSBuild installation and launch Visual Studio Installer to add the C++ workload (`Microsoft.VisualStudio.Workload.VCTools`), compiler toolchain (`Microsoft.VisualStudio.Component.VC.Tools.x86.x64`), and Windows 10 SDK (`Microsoft.VisualStudio.Component.Windows10SDK.19041`).

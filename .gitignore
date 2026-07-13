@@ -230,3 +230,6 @@ stamp-h[1-9]
 /libfmos
 /libhmac
 /libuna
+
+# Antigravity CLI workspace files
+.antigravitycli/
