@@ -346,6 +346,16 @@ int mount_dokan_filldir(
 
 		return( -1 );
 	}
+	/* Mark macOS-style dot files and directories (but not "." and "..")
+	 * as hidden, matching their hidden status in Finder.
+	 */
+	if( ( name[ 0 ] == (wchar_t) '.' )
+	 && ( name[ 1 ] != (wchar_t) 0 )
+	 && ( ( name[ 1 ] != (wchar_t) '.' )
+	  ||  ( name[ 2 ] != (wchar_t) 0 ) ) )
+	{
+		find_data->dwFileAttributes |= FILE_ATTRIBUTE_HIDDEN;
+	}
 	if( fill_find_data(
 	     find_data,
 	     file_info ) != 0 )
@@ -471,14 +481,19 @@ int __stdcall mount_dokan_CreateFile(
 	     (mount_file_entry_t **) &( file_info->Context ),
 	     &error ) != 1 )
 	{
-		libcerror_error_set(
-		 &error,
-		 LIBCERROR_ERROR_DOMAIN_RUNTIME,
-		 LIBCERROR_RUNTIME_ERROR_GET_FAILED,
-		 "%s: unable to retrieve file entry for path: %ls.",
-		 function,
-		 path );
-
+		/* Do not report a missing path (e.g. Windows Explorer probing for
+		 * desktop.ini) as an error, since the file genuinely does not exist.
+		 */
+		if( error != NULL )
+		{
+			libcerror_error_set(
+			 &error,
+			 LIBCERROR_ERROR_DOMAIN_RUNTIME,
+			 LIBCERROR_RUNTIME_ERROR_GET_FAILED,
+			 "%s: unable to retrieve file entry for path: %ls.",
+			 function,
+			 path );
+		}
 		result = -ERROR_FILE_NOT_FOUND;
 
 		goto on_error;
@@ -580,14 +595,19 @@ NTSTATUS __stdcall mount_dokan_ZwCreateFile(
 	     (mount_file_entry_t **) &( file_info->Context ),
 	     &error ) != 1 )
 	{
-		libcerror_error_set(
-		 &error,
-		 LIBCERROR_ERROR_DOMAIN_RUNTIME,
-		 LIBCERROR_RUNTIME_ERROR_GET_FAILED,
-		 "%s: unable to retrieve file entry for path: %ls.",
-		 function,
-		 path );
-
+		/* Do not report a missing path (e.g. Windows Explorer probing for
+		 * desktop.ini) as an error, since the file genuinely does not exist.
+		 */
+		if( error != NULL )
+		{
+			libcerror_error_set(
+			 &error,
+			 LIBCERROR_ERROR_DOMAIN_RUNTIME,
+			 LIBCERROR_RUNTIME_ERROR_GET_FAILED,
+			 "%s: unable to retrieve file entry for path: %ls.",
+			 function,
+			 path );
+		}
 		result = STATUS_OBJECT_NAME_NOT_FOUND;
 
 		goto on_error;
@@ -674,14 +694,19 @@ int __stdcall mount_dokan_OpenDirectory(
 	     (mount_file_entry_t **) &( file_info->Context ),
 	     &error ) != 1 )
 	{
-		libcerror_error_set(
-		 &error,
-		 LIBCERROR_ERROR_DOMAIN_RUNTIME,
-		 LIBCERROR_RUNTIME_ERROR_GET_FAILED,
-		 "%s: unable to retrieve file entry for path: %ls.",
-		 function,
-		 path );
-
+		/* Do not report a missing path (e.g. Windows Explorer probing for
+		 * desktop.ini) as an error, since the file genuinely does not exist.
+		 */
+		if( error != NULL )
+		{
+			libcerror_error_set(
+			 &error,
+			 LIBCERROR_ERROR_DOMAIN_RUNTIME,
+			 LIBCERROR_RUNTIME_ERROR_GET_FAILED,
+			 "%s: unable to retrieve file entry for path: %ls.",
+			 function,
+			 path );
+		}
 		result = MOUNT_DOKAN_ERROR_FILE_NOT_FOUND;
 
 		goto on_error;
@@ -990,14 +1015,19 @@ NTSTATUS __stdcall mount_dokan_FindFiles(
 	     &file_entry,
 	     &error ) != 1 )
 	{
-		libcerror_error_set(
-		 &error,
-		 LIBCERROR_ERROR_DOMAIN_RUNTIME,
-		 LIBCERROR_RUNTIME_ERROR_GET_FAILED,
-		 "%s: unable to retrieve file entry for path: %ls.",
-		 function,
-		 path );
-
+		/* Do not report a missing path (e.g. Windows Explorer probing for
+		 * desktop.ini) as an error, since the file genuinely does not exist.
+		 */
+		if( error != NULL )
+		{
+			libcerror_error_set(
+			 &error,
+			 LIBCERROR_ERROR_DOMAIN_RUNTIME,
+			 LIBCERROR_RUNTIME_ERROR_GET_FAILED,
+			 "%s: unable to retrieve file entry for path: %ls.",
+			 function,
+			 path );
+		}
 		result = MOUNT_DOKAN_ERROR_FILE_NOT_FOUND;
 
 		goto on_error;
@@ -1164,6 +1194,41 @@ NTSTATUS __stdcall mount_dokan_FindFiles(
 
 			goto on_error;
 		}
+		/* Skip individual entries with a (escaped) name that does not fit
+		 * DOKAN_MAX_PATH instead of aborting the entire directory listing.
+		 */
+		if( name_size > (size_t) DOKAN_MAX_PATH )
+		{
+			if( libcnotify_verbose != 0 )
+			{
+				libcnotify_printf(
+				 "%s: skipping sub file entry: %d with out of bounds name size.\n",
+				 function,
+				 sub_file_entry_index );
+			}
+			memory_free(
+			 name );
+
+			name = NULL;
+
+			if( mount_file_entry_free(
+			     &sub_file_entry,
+			     &error ) != 1 )
+			{
+				libcerror_error_set(
+				 &error,
+				 LIBCERROR_ERROR_DOMAIN_RUNTIME,
+				 LIBCERROR_RUNTIME_ERROR_FINALIZE_FAILED,
+				 "%s: unable to free sub file entry: %d.",
+				 function,
+				 sub_file_entry_index );
+
+				result = MOUNT_DOKAN_ERROR_GENERIC_FAILURE;
+
+				goto on_error;
+			}
+			continue;
+		}
 		if( mount_dokan_filldir(
 		     fill_find_data,
 		     file_info,
@@ -1313,14 +1378,19 @@ NTSTATUS __stdcall mount_dokan_GetFileInformation(
 	     &file_entry,
 	     &error ) != 1 )
 	{
-		libcerror_error_set(
-		 &error,
-		 LIBCERROR_ERROR_DOMAIN_RUNTIME,
-		 LIBCERROR_RUNTIME_ERROR_GET_FAILED,
-		 "%s: unable to retrieve file entry for path: %ls.",
-		 function,
-		 path );
-
+		/* Do not report a missing path (e.g. Windows Explorer probing for
+		 * desktop.ini) as an error, since the file genuinely does not exist.
+		 */
+		if( error != NULL )
+		{
+			libcerror_error_set(
+			 &error,
+			 LIBCERROR_ERROR_DOMAIN_RUNTIME,
+			 LIBCERROR_RUNTIME_ERROR_GET_FAILED,
+			 "%s: unable to retrieve file entry for path: %ls.",
+			 function,
+			 path );
+		}
 		result = MOUNT_DOKAN_ERROR_FILE_NOT_FOUND;
 
 		goto on_error;
