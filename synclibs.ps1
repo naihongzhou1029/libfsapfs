@@ -7,6 +7,13 @@ Param (
 )
 
 $GitUrlPrefix = "https://github.com/libyal"
+# Per-library URL overrides for forks that carry local patches not yet upstreamed.
+# libcfile: forked to fix Windows raw device bytes-per-sector detection
+# (FILE_ALIGNMENT_INFO -> IOCTL_DISK_GET_DRIVE_GEOMETRY_EX), which upstream
+# libyal/libcfile miscomputes as block_size = 3 and breaks all \\.\PhysicalDriveN reads.
+$GitUrlOverrides = @{
+	"libcfile" = "https://github.com/naihongzhou1029/libcfile.git"
+}
 $LocalLibs = "libbfio libcaes libcdata libcerror libcfile libclocale libcnotify libcpath libcsplit libcthreads libfcache libfdata libfdatetime libfguid libfmos libhmac libuna"
 $LocalLibs = ${LocalLibs} -split " "
 
@@ -23,7 +30,14 @@ ForEach (${LocalLib} in ${LocalLibs})
 	{
 		Continue
 	}
-	$GitUrl = "${GitUrlPrefix}/${LocalLib}.git"
+	If ($GitUrlOverrides.ContainsKey(${LocalLib}))
+	{
+		$GitUrl = $GitUrlOverrides[${LocalLib}]
+	}
+	Else
+	{
+		$GitUrl = "${GitUrlPrefix}/${LocalLib}.git"
+	}
 
 	# PowerShell will raise NativeCommandError if git writes to stdout or stderr
 	# therefore 2>&1 is added and the output is stored in a variable.
