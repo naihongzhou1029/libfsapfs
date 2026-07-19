@@ -1,5 +1,43 @@
 # 開發日誌索引 / Development Journal Index
 
+# 2026/07/19
+
+## 卸載 X: 磁碟機,順便踩到 Git Bash 吃掉 `dokanctl` 引數的坑
+
+前一段掛好的 APFS 磁碟(`fsapfsmount.exe` 掛成 `X:`)測試完要卸載,改用 Dokan 官方管理工具 `dokanctl.exe` 處理,過程中先踩到一個工具鏈的坑,才順利卸載成功。
+
+### 踩坑:Bash 工具呼叫 `dokanctl` 只印出 usage,參數被吃掉
+
+先用 Bash 工具直接執行:
+
+```
+"/c/Program Files/Dokan/DokanLibrary-1.5.1/dokanctl.exe" /u X
+"/c/Program Files/Dokan/DokanLibrary-1.5.1/dokanctl.exe" /l a
+```
+
+兩次都失敗,`exit code 1`,只印出完整的 usage 說明(`dokanctl /u MountPoint` 等),看起來像是引數完全沒被程式收到。
+
+原因:Bash 工具背後是 Git Bash(MSYS2),MSYS2 有一套自動路徑轉換機制,只要偵測到參數開頭是單一斜線(例如 `/u` 、 `/l`),就會誤判成 Unix 路徑,自動轉換成對應的 Windows 路徑字串再傳給程式,導致 `dokanctl.exe` 實際收到的不是 `/u X` 而是一個被轉換過的路徑,自然對不上任何已知選項,只好印出 usage。
+
+改用 PowerShell 工具執行同樣的指令,完全正常:
+
+```powershell
+& "C:\Program Files\Dokan\DokanLibrary-1.5.1\dokanctl.exe" /l a
+& "C:\Program Files\Dokan\DokanLibrary-1.5.1\dokanctl.exe" /u X
+```
+
+### 卸載結果
+
+- `/l a` 確認掛載點:`MountPoint: \DosDevices\X: - DeviceName: \Device\Volume{...}`,確認 `X:` 確實掛著。
+- `/u X` 卸載:回應 `send global release for X:` 、 `Unmount status = 0`,卸載成功。
+- 再跑一次 `/l a` 驗證:回傳 `Cannot retrieve mount point list`,代表掛載點清單已空,`X:` 確實卸載乾淨。
+
+`dokanctl.exe` 路徑是 `C:\Program Files\Dokan\DokanLibrary-1.5.1\dokanctl.exe`,隨這個專案釘住的 `Dokan Library v1.5.1.1000` 一起安裝,是官方提供的掛載點查詢/卸載管理工具。
+
+### 通用教訓
+
+以後在 Windows 上用 Claude Code 呼叫任何「單一斜線開頭」的 Windows 風格參數(例如 `dokanctl` 的 `/u` 、 `/l` 、 `/i` 、 `/r` ,或其他 Windows CLI 工具的 `/flag` 語法)時,一律優先用 PowerShell 工具,不要用 Bash 工具 —— Git Bash 的 MSYS2 路徑轉換會把這類參數當成 Unix 路徑吃掉,導致程式收到錯誤或空白的引數,且失敗時的錯誤訊息(印出 usage)不會直接指向真正的原因,容易誤判成程式本身的問題。
+
 # 2026/07/17
 
 ## 修好 Windows raw device 讀取,實測掛載外接 APFS 磁碟
