@@ -17,12 +17,22 @@ Use `devops.ps1` to manage the toolchain environment and build tasks:
 .\devops.ps1 env        # Pre-flight check and build local dependencies (zlib, dokan)
 .\devops.ps1 build      # Build release artifacts into build/
 .\devops.ps1 rebuild    # Clean and rebuild the project
+.\devops.ps1 probe      # List disks/partitions and detect APFS container candidates
+.\devops.ps1 mount -PhysicalDrive 1 -Offset 135266304 -MountPoint X:   # Mount via fsapfsmount.exe (Dokan)
+.\devops.ps1 unmount -MountPoint X:                                    # Unmount via dokanctl.exe
+.\devops.ps1 gui                                                      # Mount/unmount from a window instead
 ```
 Available options for `devops.ps1`:
 - `-Configuration <Release|Debug>` (default: Release)
 - `-Platform <x64|Win32|ARM64>` (default: x64)
 - `-VisualStudioVersion <2019|2022>` (default: auto-detected)
 - `-BuildDir <path>` (default: build)
+
+`probe`/`mount`/`unmount` are read-only-mount helpers built on top of `fsapfsmount.exe` and `dokanctl.exe`:
+- `probe` lists disks via `Get-Disk`/`Get-Partition` and flags GPT partitions whose type GUID is `7c3457ef-0000-11aa-aa11-00306543ecac` (Apple APFS) as mount candidates, printing the ready-to-use `mount` command for each (and, if `fsapfsinfo.exe` is built and the session is elevated, the container/volume identifiers).
+- `mount` requires an elevated (Administrator) session and the Dokan kernel driver installed (see below); it launches `fsapfsmount.exe` detached (it blocks in `DokanMain()` for the life of the mount and never daemonizes on Windows) and logs stdout/stderr under `build\mount-logs\`.
+- `unmount` requires an elevated session and shells out to `dokanctl.exe /u` (auto-located under `Program Files\Dokan\*\dokanctl.exe`).
+- `gui` opens a small fixed-size window (mountable disks on top, mounted/unmountable disks below, each with its own Mount/UnMount button) built on `Get-MountableApfsDisks`/`Get-FsApfsMountInstances`, for picking a disk instead of typing `-PhysicalDrive`/`-Offset`/`-MountPoint`. `mount-gui.bat` (repo root, next to `devops.ps1`) is a double-click launcher for it that auto-elevates via UAC (checks `net session`, then relaunches itself elevated if needed) so a non-technical user never has to open PowerShell manually; it resolves `devops.ps1` relative to its own folder (`%~dp0`), so the two files must stay side by side.
 
 **Key configure options** (see `configure.ac`):
 - `--enable-python` / `--disable-python` - Python bindings (pyfsapfs)
