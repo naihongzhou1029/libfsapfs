@@ -42,6 +42,7 @@ Param (
 	[string]$BuildDir = "build",
 	[switch]$InstallVisualStudio = $false,
 	[switch]$InstallDokan = $false,
+	[switch]$Hidden = $false,
 	[string]$PhysicalDrive = "",
 	[string]$Source = "",
 	[string]$Offset = "",
@@ -460,6 +461,30 @@ Function Test-IsElevated
 	$CurrentPrincipal = New-Object Security.Principal.WindowsPrincipal(${CurrentIdentity})
 
 	Return ${CurrentPrincipal}.IsInRole([Security.Principal.WindowsBuiltinRole]::Administrator)
+}
+
+Function Hide-ConsoleWindow
+{
+	# Hiding via Start-Process's own -WindowStyle Hidden is not used for the
+	# 'gui' command because combining it with -Verb RunAs (see mount-gui.bat)
+	# creates the WinForms window itself already hidden (Visible=$FALSE), not
+	# just the console; hiding this process's own console after the fact,
+	# from inside the process, sidesteps that entirely regardless of how the
+	# process was launched (elevated or not).
+	Add-Type -Name Win32ConsoleWindow -Namespace DevopsGui -MemberDefinition @'
+[DllImport("kernel32.dll")]
+public static extern IntPtr GetConsoleWindow();
+
+[DllImport("user32.dll")]
+public static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
+'@ -ErrorAction SilentlyContinue
+
+	$ConsoleHandle = [DevopsGui.Win32ConsoleWindow]::GetConsoleWindow()
+
+	If (${ConsoleHandle} -ne [IntPtr]::Zero)
+	{
+		[DevopsGui.Win32ConsoleWindow]::ShowWindow(${ConsoleHandle}, 0) | Out-Null # SW_HIDE
+	}
 }
 
 Function Find-DokanCtl
@@ -941,6 +966,10 @@ Function Invoke-Gui
 
 		Return $FALSE
 	}
+	If (${Hidden})
+	{
+		Hide-ConsoleWindow
+	}
 	Add-Type -AssemblyName System.Windows.Forms
 	Add-Type -AssemblyName System.Drawing
 
@@ -1121,6 +1150,9 @@ Options:
                                         install of VS Build Tools via winget
   -InstallDokan                        Let 'env' attempt an unattended
                                         install of Dokan Library v1.5.1.1000 via winget
+  -Hidden                              'gui' only: hide this process's own
+                                        console window once elevation is
+                                        confirmed (used by mount-gui.bat)
 
 Mount/unmount options:
   -PhysicalDrive <number>               Disk number (from 'probe'), resolved
